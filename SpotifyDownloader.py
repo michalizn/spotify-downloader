@@ -1,5 +1,6 @@
-#!/usr/local/bin/python3
 import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -15,6 +16,12 @@ import eyed3
 # Global variable to signal the thread to stop
 stop_thread = False
 file_path = os.path.expanduser("~/Downloads")
+
+# Global variable to store the progress bar widget
+progress_bar = None
+
+# Label to display the progress percentage
+progress_label = None
 
 def remove_special_characters(input_string):
     return ''.join(char if char.isalnum() or char.isspace() or char in '()-,' else '_' for char in input_string)
@@ -33,7 +40,7 @@ def process_file(file_path, dest_file):
         print(f"Error processing file {file_path}: {e}")
 
 def download_task(url):
-    global stop_thread
+    global stop_thread, progress_var, progress_bar, progress_label
 
     # URL of the initial page
     initial_url = 'https://spotifydown.com/'
@@ -73,7 +80,7 @@ def download_task(url):
     while True:
         try:
             # Wait for the "Load More" button to be clickable
-            wait = WebDriverWait(driver, 10)
+            wait = WebDriverWait(driver, 30)
             loadmore_link = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Load More"]')))
             loadmore_link.click()
 
@@ -114,22 +121,37 @@ def download_task(url):
                 multiples += 1
             
             for x in range(multiples):
-                wait = WebDriverWait(driver, 10)
-                loadmore_link = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Load More"]')))
-                loadmore_link.click()
+                try:
+                    wait = WebDriverWait(driver, 30)
+                    loadmore_link = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Load More"]')))
+                    loadmore_link.click()
 
-            time.sleep(1)
+                    time.sleep(1)
 
-            download_buttons = driver.find_elements(By.XPATH, '//button[text()="Download"]')
-            download_buttons[i - 100*multiples].click()
+                    download_buttons = driver.find_elements(By.XPATH, '//button[text()="Download"]')
+                    download_buttons[i - 100*multiples].click()
+                except:
+                    continue
+        
+        # Update progress bar
+        progress_value = (i / song_count) * 100
+        progress_var.set(progress_value)
+
+        # Update progress label
+        progress_label.config(text=f"Progress: {int(progress_value)}%")
 
         # Wait for the dynamic changes after clicking the "Download" button
         try:
-            wait = WebDriverWait(driver, 20)
+            wait = WebDriverWait(driver, 30)
             download_mp3_link = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'transition')))
             download_mp3_link.click()
         except Exception as e:
             err_num.append(i)
+
+        for root, dirs, files in os.walk(file_path):
+            for file in files:
+                path_file = os.path.join(root, file)
+                process_file(path_file, file_path)
 
         # Add a delay if needed to allow time for the download to start
         time.sleep(1)
@@ -142,33 +164,64 @@ def download_task(url):
             path_file = os.path.join(root, file)
             process_file(path_file, file_path)
 
+    # Update progress bar to 100% after completion
+    progress_var.set(100.0)
+
+    # Update progress label
+    progress_label.config(text="Progress: 100%")
+    
     # Re-enable the "Download" button after completion
     gui_download_button.config(state=tk.NORMAL)
+    label.config(state=tk.NORMAL)
 
-def on_button_click():
-    global stop_thread
-
-    # Disable the "Download" button to prevent further clicks
-    gui_download_button.config(state=tk.DISABLED)
-
-    # Enable the "Download" button to prevent further clicks
-    stop_button.config(state=tk.NORMAL)
+def on_download_click():
+    global stop_thread, progress_bar, progress_label
 
     # Get the input value
     url = entry.get()
+    if 'open.spotify' in url:
+        # Destroy the progress bar
+        if progress_bar:
+            progress_bar.destroy()
+            progress_var.set(0.0)
+            progress_label.destroy()
 
-    # Clear the text in the Entry widget
-    entry.delete(0, tk.END)
+        # Disable the "Download" button and label to prevent further clicks
+        gui_download_button.config(state=tk.DISABLED)
+        label.config(state=tk.DISABLED)
 
-    # Reset the stop_thread flag
-    stop_thread = False
+        # Enable the "Stop" button to prevent further clicks
+        stop_button.config(state=tk.NORMAL)
 
-    # Create a new thread for the download task
-    download_thread = threading.Thread(target=download_task, args=(url,))
-    download_thread.start()
+        # Create a progress bar
+        progress_bar = ttk.Progressbar(root, variable=progress_var, orient="horizontal", length=200, mode="determinate")
+        progress_bar.pack(pady=4)
+
+        # Create a label for progress percentage
+        progress_label = tk.Label(root, text="Progress: 0%")
+        progress_label.pack(pady=5)
+
+        # Get the input value
+        url = entry.get()
+
+        # Clear the text in the Entry widget
+        entry.delete(0, tk.END)
+
+        # Reset the stop_thread flag
+        stop_thread = False
+
+        # Create a new thread for the download task
+        download_thread = threading.Thread(target=download_task, args=(url,))
+        download_thread.start()
+    else:
+        # Clear the text in the Entry widget
+        entry.delete(0, tk.END)
+
+        # Perform actions when the "Stop" button is clicked
+        messagebox.showinfo("Error", "Wrong URL Address!")
 
 def on_stop_click():
-    global stop_thread
+    global stop_thread, progress_bar, progress_label
 
     # Disable the "Download" button to prevent further clicks
     stop_button.config(state=tk.DISABLED)
@@ -181,7 +234,7 @@ root = tk.Tk()
 root.title("SpotifyDownloader")
 
 # Set the size of the window
-root.geometry("400x200")
+root.geometry("400x250")
 
 # Create and pack widgets
 label = tk.Label(root, text="Enter playlist/song URL:")
@@ -191,12 +244,16 @@ entry = tk.Entry(root)
 entry.pack(pady=10)
 
 # Download button
-gui_download_button = tk.Button(root, text="Download", command=on_button_click)
+gui_download_button = tk.Button(root, text="Download", command=on_download_click)
 gui_download_button.pack(padx=5, pady=10)
 
 # Stop button
 stop_button = tk.Button(root, text="Stop", command=on_stop_click)
 stop_button.pack(padx=5, pady=10)
+
+# Global variables for progress bar
+progress_var = tk.DoubleVar()
+progress_var.set(0.0)
 
 # Start the main event loop
 root.mainloop()
