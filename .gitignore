@@ -1,0 +1,5 @@
+/build
+/dist/SpotifyDownloader.app
+*.icns
+*.spec
+*.DS_Store
