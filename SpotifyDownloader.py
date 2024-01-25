@@ -29,6 +29,27 @@ progress_label = None
 text_label = None
 image_label = None
 
+def remove_ads(driver):
+    time.sleep(0.5)
+    all_iframes = driver.find_elements(By.TAG_NAME, "iframe")  # Use By.TAG_NAME from selenium.webdriver.common.by
+
+    if len(all_iframes) > 0:
+        print("Ad Found\n")
+        driver.execute_script("""
+            var elems = document.getElementsByTagName("iframe"); 
+            for(var i = 0, max = elems.length; i < max; i++)
+            {
+                elems[i].hidden=true;
+            }
+        """)
+        print('Total Ads: ' + str(len(all_iframes)))
+    else:
+        print('No frames found')
+
+    all_iframes = driver.find_elements(By.TAG_NAME, "iframe")  # Use By.TAG_NAME from selenium.webdriver.common.by
+
+# Example usage:
+
 def click_consent_button(driver):
     try:
         # Wait for the consent button to be clickable
@@ -98,6 +119,12 @@ def process_file(file_path, dest_file):
         os.rename(file_path, dest_file)
     except Exception as e:
         print(f"Error processing file {file_path}: {e}")
+        # Delete the file if an error occurs
+        try:
+            os.remove(file_path)
+            print(f"Deleted file: {file_path}")
+        except Exception as delete_error:
+            print(f"Error deleting file {file_path}: {delete_error}")
 
 def download_task(url):
     global stop_thread, progress_var, progress_bar, progress_label, text_label, image_label
@@ -129,14 +156,24 @@ def download_task(url):
     # Input the URL into the search field
     search_input.send_keys(input_url)
 
+    # Accept the cookies 
+    click_consent_button(driver)
+
+    
+    
+
     # Find the "Download" button and click on it using XPath
     # Wait for the "Download" button to be clickable
     wait = WebDriverWait(driver, 10)
     download_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Download"]')))
     download_button.click()
+    
+    
 
     # Wait for the presence of the specified <p> element
     wait.until(EC.presence_of_element_located((By.XPATH, '//p[@class="font-bold text-main mt-2"]')))
+    
+    
 
     time.sleep(0.5)
     # Get HTML content
@@ -145,53 +182,61 @@ def download_task(url):
 
     # Extract text from HTML content
     extracted_text = extract_name_from_html(html_content)
+    
+    
 
     # Display extracted text in Tkinter label
     if extracted_text:
         # Update progress label
         text_label.config(text=f"{str(extracted_text)}")
-
+        
+        
         # Extract the image source URL
         image_url = driver.find_element(By.CLASS_NAME, 'object-cover').get_attribute('src')
-
+        
+        
         # Download the image directly using requests
         response = requests.get(image_url)
         image_data = BytesIO(response.content)
-
+        
+        
         # Convert the image data to a Pillow Image
         pillow_image = Image.open(image_data)
-
+        
+        
         # Scale the image (adjust the size as needed)
         scaled_width = 200  # Set the desired width
         scaled_height = int((scaled_width / pillow_image.width) * pillow_image.height)
         scaled_image = pillow_image.resize((scaled_width, scaled_height), Image.ANTIALIAS)
-
+        
+        
         # Display the image in Tkinter
         tk_image = ImageTk.PhotoImage(scaled_image)
         image_label.config(image=tk_image)
         image_label.image = tk_image
-
+        
+        
     # Wait for the dynamic changes after clicking the "Download" button
     # Wait for the "Download" button to be clickable
     wait = WebDriverWait(driver, 10)
     download_buttons = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//button[text()="Download"]')))
     song_count = len(download_buttons)
+    
+    
 
     while True:
-        try:
+        try:     
+
             # Wait for the "Load More" button to be clickable
             wait = WebDriverWait(driver, 5)
             loadmore_link = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Load More"]')))
             loadmore_link.click()
-
             # Wait for the presence of the specified <p> element
             wait.until(EC.presence_of_element_located((By.XPATH, '//p[@class="font-bold text-main mt-2"]')))
-
             # Wait for the dynamic changes after clicking the "Download" button
             # Wait for the "Download" button to be clickable
             wait = WebDriverWait(driver, 10)
             download_buttons = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//button[text()="Download"]')))
-
             # Increment the song_count variable by the number of "Download" buttons found
             song_count += len(download_buttons)
         except Exception as e:
@@ -207,19 +252,27 @@ def download_task(url):
         # Open the initial page
         driver.get(initial_url)
         print("Driver init")
+        
+        
         # Find the search input element using its class name
         # Wait for the search input element to be visible
         wait = WebDriverWait(driver, 10)
         search_input = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'searchInput')))
         print("Search input located")
+        
+        
         # Input the URL into the search field
         search_input.send_keys(input_url)
         print("URL typed")
+        
+         
         # Find the "Download" button and click on it using XPath
         wait = WebDriverWait(driver, 10)
         download_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Download"]')))
         download_button.click()
         print("Big D Button clicked")
+        
+         
 
         # Update progress label
         try:
@@ -247,16 +300,16 @@ def download_task(url):
             # Wait for the dynamic changes after clicking the "Download" button
             # Wait for the "Download" button to be clickable
             wait = WebDriverWait(driver, 10)
-    
-            # # Wait for the overlay to disappear
-            # try:
-            #     wait.until_not(EC.presence_of_element_located((By.CLASS_NAME, 'fc-dialog-overlay')))
-            # except:
-            #     print("Error tih overlay")
 
             download_buttons = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//button[text()="Download"]')))
             print(len(download_buttons))
-            download_buttons[i].click()
+            # Wait for the ith element to be clickable
+            wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Download"]')))
+
+            # Click on the ith element
+            #download_buttons[i].click()
+            driver.execute_script("arguments[0].click();", download_buttons[i])
+
             print(f"Got all the buttons and clicked on selected one: {i}")
         else:
             if i % 100 == 0 and i != 0:
@@ -291,19 +344,15 @@ def download_task(url):
         try:
             # Extract the image source URL
             image_url = driver.find_element(By.CLASS_NAME, 'object-cover').get_attribute('src')
-
             # Download the image directly using requests
             response = requests.get(image_url)
             image_data = BytesIO(response.content)
-
             # Convert the image data to a Pillow Image
             pillow_image = Image.open(image_data)
-
             # Scale the image (adjust the size as needed)
             scaled_width = 200  # Set the desired width
             scaled_height = int((scaled_width / pillow_image.width) * pillow_image.height)
             scaled_image = pillow_image.resize((scaled_width, scaled_height), Image.ANTIALIAS)
-
             # Display the image in Tkinter
             tk_image = ImageTk.PhotoImage(scaled_image)
             image_label.config(image=tk_image)
@@ -319,7 +368,7 @@ def download_task(url):
             print("Waiting on download")
             wait = WebDriverWait(driver, 30)
             download_mp3_link = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'transition')))
-            download_mp3_link.click()
+            driver.execute_script("arguments[0].click();", download_mp3_link)
             print("Song downloaded")
         except Exception as e:
             for reattempt in range(2):
@@ -374,7 +423,8 @@ def download_task(url):
                     wait = WebDriverWait(driver, 10)
                     download_buttons = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//button[text()="Download"]')))
                     print(len(download_buttons))
-                    download_buttons[i].click()
+                    driver.execute_script("arguments[0].click();", download_buttons[i])
+                    #download_buttons[i].click()
                     print(f"Got all the buttons and clicked on selected one: {i}")
                 else:
                     if i % 100 == 0 and i != 0:
@@ -409,11 +459,9 @@ def download_task(url):
                 try:
                     # Extract the image source URL
                     image_url = driver.find_element(By.CLASS_NAME, 'object-cover').get_attribute('src')
-
                     # Download the image directly using requests
                     response = requests.get(image_url)
                     image_data = BytesIO(response.content)
-
                     # Convert the image data to a Pillow Image
                     pillow_image = Image.open(image_data)
 
@@ -435,8 +483,9 @@ def download_task(url):
                     print("Waiting on download")
                     wait = WebDriverWait(driver, 30)
                     download_mp3_link = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'transition')))
-                    download_mp3_link.click()
+                    driver.execute_script("arguments[0].click();", download_mp3_link)
                     print("Song downloaded")
+                    break
                 except Exception as e:
                     if reattempt == 1:
                         # Update text label
