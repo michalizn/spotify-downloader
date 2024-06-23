@@ -136,8 +136,8 @@ def download_task(url):
     initial_url = 'https://spotifydown.com/'
 
     # Input URL for testing
-    input_url = url
-    
+    input_url = url.split('?')[0]
+    print(input_url)
     # Set up Firefox options for headless mode
     firefox_options = Options()
     firefox_options.add_argument('--headless')
